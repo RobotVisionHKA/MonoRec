@@ -7,6 +7,7 @@ import torchvision
 from PIL import Image
 from scipy.spatial.transform import Rotation
 from torch.utils.data import Dataset
+
 import math
 import os
 import yaml
@@ -59,6 +60,7 @@ class TUMVIDataset(Dataset):
         self.T_cam1_cam0 = {}
         self.orig_image_size = {}
         self.resz_shape = {}
+        self.scale = {}
         self.crop_box = {}
 
         self.cam0_pcalib = {}
@@ -77,9 +79,10 @@ class TUMVIDataset(Dataset):
             cam0_i, cam1_i, img_size = self.load_intrinsics(seq)
             self.orig_image_size[seq] = img_size
 
-            cam0_i, cam1_i, _resz_shape, _box = format_intrinsics(cam0_i, cam1_i, self.target_image_size, img_size)
+            cam0_i, cam1_i, _scale, _resz_shape, _box = format_intrinsics(cam0_i, cam1_i, self.target_image_size, img_size)
             self.cam0_intrinsics[seq] = cam0_i
             self.cam1_intrinsics[seq] = cam1_i
+            self.scale[seq] = _scale
             self.resz_shape[seq] = _resz_shape
             self.crop_box[seq] = _box
 
@@ -192,7 +195,8 @@ class TUMVIDataset(Dataset):
 
         assert cam_data["cam0"]["resolution"] == cam_data["cam1"]["resolution"]
 
-        img_size = (cam_data["cam0"]["resolution"][0], cam_data["cam0"]["resolution"][1])
+        # image size in tumvi yaml is mentioned as (width, height)
+        img_size = (cam_data["cam0"]["resolution"][1], cam_data["cam0"]["resolution"][0])
         
         self.T_cam1_cam0[seq] = torch.tensor(np.array(cam_data["cam1"]["T_cn_cnm1"]), dtype=torch.float32)
 
@@ -254,7 +258,8 @@ class TUMVIDataset(Dataset):
 
     # load pcalib
     def invert_pcalib(self, pcalib_path):
-        assert os.path.exists(pcalib_path)
+        if not os.path.exists(pcalib_path):
+            return None
         pcalib = np.loadtxt(pcalib_path)
         inv_pcalib = torch.zeros(256, dtype=torch.float32)
         j = 0
@@ -275,11 +280,11 @@ class TUMVIDataset(Dataset):
             img = Image.open(self.cam0_paths[seq][self.pose_times[seq][index]])
         img = img.convert('RGB')
 
-        if crop_box:
-            img = img.crop(crop_box)
-
         if self.resz_shape[seq]:
             img = img.resize((self.resz_shape[seq][1], self.resz_shape[seq][0]), resample=Image.BILINEAR)
+
+        if crop_box:
+            img = img.crop(crop_box)
 
         if keyframe_index and self.debug:
             debug_path = self.dataset_dir / f"{seq}/monorec_data"
@@ -290,9 +295,9 @@ class TUMVIDataset(Dataset):
 
         image_tensor = torch.tensor(np.array(img)).to(dtype=torch.float32)
 
-        if stereo:
+        if stereo and self.cam1_pcalib[seq]:
             image_tensor = self.cam1_pcalib[seq][image_tensor.to(dtype=torch.long)]
-        else:
+        elif self.cam0_pcalib[seq]:
             image_tensor = self.cam0_pcalib[seq][image_tensor.to(dtype=torch.long)]
         
         image_tensor = image_tensor / 255 - .5
@@ -322,7 +327,13 @@ class TUMVIDataset(Dataset):
             for l in lines[1:]:
                 tmp = l.split()
                 try:
-                    x, y, i_depth = round(float(tmp[0])), round(float(tmp[1])), float(tmp[2])
+                    x, y, i_depth = float(tmp[0]), float(tmp[1]), float(tmp[2])
+                    
+                    x = (x+0.5)*self.scale[seq] - 0.5    
+                    y = (y+0.5)*self.scale[seq] - 0.5    
+                    
+                    x, y = round(x), round(y)
+                    
                 except:
                     continue
                 if math.isnan(i_depth):
@@ -342,6 +353,12 @@ class TUMVIDataset(Dataset):
 
 def format_intrinsics(cam0_intrinsics, cam1_intrinsics, target_image_size, orig_image_size):
 
+    cam0_fx = cam0_intrinsics[0,0].item()
+    cam0_fy = cam0_intrinsics[1,1].item()
+
+    cam1_fx = cam1_intrinsics[0,0].item()
+    cam1_fy = cam1_intrinsics[1,1].item()
+
     cam0_cx = cam0_intrinsics[0,2].item()
     cam0_cy = cam0_intrinsics[1,2].item()
 
@@ -351,21 +368,36 @@ def format_intrinsics(cam0_intrinsics, cam1_intrinsics, target_image_size, orig_
     (new_h, new_w) = target_image_size
     (orig_h, orig_w) = orig_image_size
 
-    assert new_h < orig_h
-    assert new_w == orig_w
+    scale = 1.0
+    resz_shp = None
 
-    cam0_cx_new = (cam0_cx + 0.5) - 0.5 - (orig_w - new_w)//2
-    cam0_cy_new = (cam0_cy + 0.5) - 0.5 - (orig_h - new_h)//2
+    if new_w != orig_w:
+        scale = new_w/orig_w
+        orig_h = round(orig_h * scale)
+        orig_w = round(orig_w * scale)
+        resz_shp = (orig_h, orig_w)
 
-    cam1_cx_new = (cam1_cx + 0.5) - 0.5 - (orig_w - new_w)//2
-    cam1_cy_new = (cam1_cy + 0.5) - 0.5 - (orig_h - new_h)//2
+    cam0_fx_new = cam0_fx * scale        
+    cam0_fy_new = cam0_fy * scale
+    cam1_fx_new = cam1_fx * scale        
+    cam1_fy_new = cam1_fy * scale
+
+    cam0_cx_new = (cam0_cx + 0.5)*scale - 0.5 - (orig_w - new_w)//2
+    cam0_cy_new = (cam0_cy + 0.5)*scale - 0.5 - (orig_h - new_h)//2
+
+    cam1_cx_new = (cam1_cx + 0.5)*scale - 0.5 - (orig_w - new_w)//2
+    cam1_cy_new = (cam1_cy + 0.5)*scale - 0.5 - (orig_h - new_h)//2
 
     cam0_intrinsics_new = cam0_intrinsics.clone()
     cam1_intrinsics_new = cam1_intrinsics.clone()
 
+    cam0_intrinsics_new[0,0] = cam0_fx_new
+    cam0_intrinsics_new[1,1] = cam0_fy_new
     cam0_intrinsics_new[0,2] = cam0_cx_new
     cam0_intrinsics_new[1,2] = cam0_cy_new
 
+    cam1_intrinsics_new[0,0] = cam1_fx_new
+    cam1_intrinsics_new[1,1] = cam1_fy_new
     cam1_intrinsics_new[0,2] = cam1_cx_new
     cam1_intrinsics_new[1,2] = cam1_cy_new
     
@@ -377,4 +409,4 @@ def format_intrinsics(cam0_intrinsics, cam1_intrinsics, target_image_size, orig_
     print(f"new_h: {new_h}")
     print(box)
     """
-    return cam0_intrinsics_new, cam1_intrinsics_new, None, box
+    return cam0_intrinsics_new, cam1_intrinsics_new, scale, resz_shp, box
