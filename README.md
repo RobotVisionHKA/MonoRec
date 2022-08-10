@@ -75,7 +75,7 @@ python create_pointcloud.py --config configs/test/pointcloud_monorec_tumvi.json
 ## Training:
 *****Note:***  
 _Change Ubuntu GUI mode for better speed during training [[ref1]](https://linuxconfig.org/how-to-disable-enable-gui-on-boot-in-ubuntu-20-04-focal-fossa-linux-desktop)[[ref2]](https://medium.com/@leicao.me/how-to-run-xorg-server-on-integrated-gpu-c5f38ae7ccc8)   
-good practices for training on multiple GPUs [ref](https://medium.com/huggingface/training-larger-batches-practical-tips-on-1-gpu-multi-gpu-distributed-setups-ec88c3e51255)_
+good practices for training on multiple GPUs [[ref]](https://medium.com/huggingface/training-larger-batches-practical-tips-on-1-gpu-multi-gpu-distributed-setups-ec88c3e51255)_
 
 Run the following commands:  
 ```sh
