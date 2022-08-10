@@ -46,7 +46,9 @@ The overall pipeline of dataloading goes as follows:
     - check for invalid entry i.e. nans or index out of bounds of the original image size  
     - scale the keypoints according to the target image size and add to depth tensor  
     - crop the depth tensor to target image size  
-  
+
+*****Note:*** _python dictionaries have been used for the above implementation. Good references for efffective dataloader implementations [[ref1]](https://discuss.pytorch.org/t/how-to-prefetch-data-when-processing-with-gpu/548/19) [[ref2]](https://discuss.pytorch.org/t/problem-with-dataloader-when-using-list-of-dicts/67268/4)_
+
 ## PointCloud Visualization using open3d  
 The [rgbd2pcl.py](rgbd2pcl.py) script is used to generate and view pointclouds from the keyframe, predicted depth, camera intrinsics and extrinsics.  It also saves the keyframes and the predicted depth maps in the save directory mentioned in the config file(can be used for debugging).  It uses Open3d for the same. [[ref1]](http://www.open3d.org/docs/latest/tutorial/Advanced/multiway_registration.html#Make-a-combined-point-cloud)[[ref2]](http://www.open3d.org/docs/latest/tutorial/Basic/rgbd_image.html)  
 E.g.  
@@ -71,7 +73,10 @@ python create_pointcloud.py --config configs/test/pointcloud_monorec_tumvi.json
 ```
 
 ## Training:
-*****Note:*** _Change Ubuntu GUI mode for better speed during training [[ref]](https://linuxconfig.org/how-to-disable-enable-gui-on-boot-in-ubuntu-20-04-focal-fossa-linux-desktop)_   
+*****Note:***  
+_Change Ubuntu GUI mode for better speed during training [[ref1]](https://linuxconfig.org/how-to-disable-enable-gui-on-boot-in-ubuntu-20-04-focal-fossa-linux-desktop)[[ref2]](https://medium.com/@leicao.me/how-to-run-xorg-server-on-integrated-gpu-c5f38ae7ccc8)   
+good practices for training on multiple GPUs [ref](https://medium.com/huggingface/training-larger-batches-practical-tips-on-1-gpu-multi-gpu-distributed-setups-ec88c3e51255)_
+
 Run the following commands:  
 ```sh
 python train.py --config configs/train/monorec/monorec_depth_tumvi.json --options stereo                          # Depth Bootstrap
@@ -84,4 +89,5 @@ python train_monorec.py --config configs/train/monorec/monorec_depth_ref_tumvi.j
 Some hyperparameters needed to be tuned differently for the TUM-VI dataset or the dataset recorded using the RealSense from the ones used in the paper for the KITTI dataset.  
 1. The ```inv_depth_min_max``` parameter must be set to (1.0, 0.0025) for training as the dataset has been recorded using a hand-held device as opposed to a device mounted on a car(KITTI).  
 2. The ```step_size``` and ```gamma``` parameters of the ```lr_scheduler``` must be properly tuned keeping in mind the size of the dataset.  
-3. The parameter ```alpha``` which is reponsible for assigning weight to the ```sparse_depth_loss``` and the ```self_supervision_loss```(combination of photometric_inconsistency_cv and edge_aware_smoothness_loss) must be set properly after observing the intermediate results during training.
+3. The parameter ```alpha``` which is reponsible for assigning weight to the ```sparse_depth_loss``` and the ```self_supervision_loss```(combination of photometric_inconsistency_cv and edge_aware_smoothness_loss) must be set properly after observing the intermediate results during training.  
+4. The ```num_workers``` and ```batch_size``` parameters must be set considering the compute power, size of dataset etc. [[ref1]](https://chtalhaanwar.medium.com/pytorch-num-workers-a-tip-for-speedy-training-ed127d825db7) [[ref2]](https://deeplizard.com/learn/video/kWVgvsejXsE)
