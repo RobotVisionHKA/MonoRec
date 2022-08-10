@@ -83,7 +83,12 @@ python train.py --config configs/train/monorec/monorec_depth_tumvi.json --option
 python train_monorec.py --config configs/train/monorec/monorec_mask_tumvi.json --options stereo                   # Mask Bootstrap
 python train_monorec.py --config configs/train/monorec/monorec_mask_ref_tumvi.json --options mask_loss            # Mask Refinement
 python train_monorec.py --config configs/train/monorec/monorec_depth_ref_tumvi.json --options stereo stereo_repr  # Depth Refinement
-```
+```  
+
+To monitor the training using tensorboard, set the parameter ```tensorboard``` to ```true``` in the config, and run the command below in a separate terminal:  
+```sh
+DenseReconstruction$ tensorboard --logdir=saved/log/monorec_depth/00
+``` 
 
 ## Important Hyperparameters for TUM-VI/RealSense-Bag:  
 Some hyperparameters needed to be tuned differently for the TUM-VI dataset or the dataset recorded using the RealSense from the ones used in the paper for the KITTI dataset.  
