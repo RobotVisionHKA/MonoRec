@@ -61,6 +61,7 @@ Usage:
 ```sh
 python3 test_monorec.py
 ```  
+******set pretrain_mode=1 to just evaluate the depth module without using the mask module****
 
 ### Pointcloud generation:  
 To evaluate the model, a pointcloud can be generated. [CloudCompare](https://www.danielgm.net/cc/) was used for viewing the generated pointclouds. Either [rgbd2pcl.py](rgbd2pcl.py) or [create_pointcloud.py](create_pointcloud.py) can be used. Usage of [rgbd2pcl.py](rgbd2pcl.py) is mentioned above.  
