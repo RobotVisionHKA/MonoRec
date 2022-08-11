@@ -51,6 +51,12 @@ The overall pipeline of dataloading goes as follows:
 
 ## PointCloud Visualization using open3d  
 The [rgbd2pcl.py](rgbd2pcl.py) script is used to generate and view pointclouds from the keyframe, predicted depth, camera intrinsics and extrinsics.  It also saves the keyframes and the predicted depth maps in the save directory mentioned in the config file(can be used for debugging).  It uses Open3d for the same. [[ref1]](http://www.open3d.org/docs/latest/tutorial/Advanced/multiway_registration.html#Make-a-combined-point-cloud)[[ref2]](http://www.open3d.org/docs/latest/tutorial/Basic/rgbd_image.html)  
+
+Make sure to activate the conda environment(monorec with open3d installation):  
+```sh
+conda activate pcl
+```  
+
 E.g.  
 ```sh
 python3 rgbd2pcl.py --config configs/test/pointcloud_monorec_euroc.json
@@ -58,7 +64,11 @@ python3 rgbd2pcl.py --config configs/test/pointcloud_monorec_euroc.json
 
 ## Inference:  
 The [example-tumvi](example-tumvi) folder can be used to test the forward pass using the tum-vi dataloader. The [test_monorec.py](example-tumvi/test_monorec.py) script can be used to test inference on an entire dataset i.e. with multilpe sequences, and the [test_monorec_seq.py](example-tumvi/test_monorec_seq.py) can be used to test inference on a single sequence. 
-
+  
+Make sure to activate the conda environment for both inference and training using:  
+```sh
+conda activate monorec
+```
 Usage:  
 ```sh
 python3 test_monorec.py
@@ -67,6 +77,7 @@ python3 test_monorec.py
 
 ### Pointcloud generation:  
 To evaluate the model, a pointcloud can be generated. [CloudCompare](https://www.danielgm.net/cc/) was used for viewing the generated pointclouds. Either [rgbd2pcl.py](rgbd2pcl.py) or [create_pointcloud.py](create_pointcloud.py) can be used. Usage of [rgbd2pcl.py](rgbd2pcl.py) is mentioned above.  
+
 Usage for [create_pointcloud.py](create_pointcloud.py):  
 ```sh
 python create_pointcloud.py --config configs/test/pointcloud_monorec_tumvi.json
