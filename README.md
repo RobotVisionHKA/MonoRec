@@ -1,144 +1,109 @@
-# MonoRec
-[**Paper**](https://arxiv.org/abs/2011.11814) |  [**Video** (CVPR)](https://youtu.be/XimdlXUamo0) | [**Video** (Reconstruction)](https://youtu.be/-gDSBIm0vgk) | [**Project Page**](https://vision.in.tum.de/research/monorec)
+# DenseReconstruction  
+This is a clone of the [MonoRec](https://github.com/Brummi/MonoRec) repository with changes to run inference and train on Euroc type datasets, specifically the [TUM-VI](https://vision.in.tum.de/data/datasets/visual-inertial-dataset) dataset.  
 
-This repository is the official implementation of the paper:
+The tum-vi dataset is a visual inertial dataset that contains sequences recorded from a handheld setup consisting of a stereo setup with two cameras(fisheye lens). The images are grayscale. It also provide synchronised IMU data(ggyro and accel).  
 
-> **MonoRec: Semi-Supervised Dense Reconstruction in Dynamic Environments from a Single Moving Camera**
->
-> [Felix Wimbauer*](https://www.linkedin.com/in/felixwimbauer), [Nan Yang*](https://vision.in.tum.de/members/yangn), [Lukas Von Stumberg](https://vision.in.tum.de/members/stumberg), [Niclas Zeller](https://vision.in.tum.de/members/zellern) and [Daniel Cremers](https://vision.in.tum.de/members/cremers)
-> 
-> [**CVPR 2021** (arXiv)](https://arxiv.org/abs/2011.11814)
+The primary additions are:  
+1. Custom dataloader for tum-vi/euroc-format datasets  
+2. Alternate script for viewing pointclouds using the [Open3D](http://www.open3d.org/docs/latest/index.html) library  
 
-<a href="https://youtu.be/-gDSBIm0vgk"><div style="text-align:center"><img src="./pictures/frames_pointcloud.gif" style="height:auto;width:70%px"/></div></a>
-
-If you find our work useful, please consider citing our paper:
+## TUM-VI dataloader  
+The [tum-vi dataloader](data_loader/tum_vi_dataset.py) has been written in a way so that it expects the dataset to be in a specific format as shown below:  
 ```
-@InProceedings{wimbauer2020monorec,
-  title = {{MonoRec}: Semi-Supervised Dense Reconstruction in Dynamic Environments from a Single Moving Camera},
-  author = {Wimbauer, Felix and Yang, Nan and von Stumberg, Lukas and Zeller, Niclas and Cremers, Daniel},
-  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
-  year = {2021},
-}
+dataset-dir
+    ├── 00
+    |    ├── basalt_keyframe_data
+    |    │   ├── keypoints
+    |    │   ├── keypoints_viz
+    |    │   └── poses
+    |    ├── dso
+    |    │   ├── cam0
+    |    │   │   └── images -> ../../mav0/cam0/data
+    |    │   └── cam1
+    |    │       └── images -> ../../mav0/cam1/data
+    |    ├── mav0
+    |        ├── cam0
+    |        │   └── data
+    |        ├── cam1
+    |        │   └── data
+    |        ├── imu0
+    |        └── mocap0
+    ├── 01
+    ...
+```  
+The overall pipeline of dataloading goes as follows:  
+1. Load camera intrinsics for each sequence  
+2. Format the intrinsics according to the target image size  
+3. Load the poses, left stereo images, right stereo images and sparse depth keypoints  
+    - The primary key is the poses i.e. only those timestamps for which keyframe pose is available is included in the dataset  
+    - Poses are loaded and stored directly in the meory on intialization  
+    - Stereoimages and keypoints paths are stored on initialization and are accessed from the memory only during the ```_get_item()``` call  
+4. accesing images:  
+    - convert to 3-channel image
+    - image is first resized (if applicable) and then cropped to the target image size  
+5. accessing keypoints:  
+    - .txt file containing the keypoints is read  
+    - check for invalid entry i.e. nans or index out of bounds of the original image size  
+    - scale the keypoints according to the target image size and add to depth tensor  
+    - crop the depth tensor to target image size  
+
+*****Note:*** _python dictionaries have been used for the above implementation. Good references for efffective dataloader implementations [[ref1]](https://discuss.pytorch.org/t/how-to-prefetch-data-when-processing-with-gpu/548/19) [[ref2]](https://discuss.pytorch.org/t/problem-with-dataloader-when-using-list-of-dicts/67268/4)_
+
+## PointCloud Visualization using open3d  
+The [rgbd2pcl.py](rgbd2pcl.py) script is used to generate and view pointclouds from the keyframe, predicted depth, camera intrinsics and extrinsics.  It also saves the keyframes and the predicted depth maps in the save directory mentioned in the config file(can be used for debugging).  It uses Open3d for the same. [[ref1]](http://www.open3d.org/docs/latest/tutorial/Advanced/multiway_registration.html#Make-a-combined-point-cloud)[[ref2]](http://www.open3d.org/docs/latest/tutorial/Basic/rgbd_image.html)  
+
+Make sure to activate the conda environment(monorec with open3d installation):  
+```sh
+conda activate pcl
+```  
+
+E.g.  
+```sh
+python3 rgbd2pcl.py --config configs/test/pointcloud_monorec_euroc.json
+```  
+
+## Inference:  
+The [example-tumvi](example-tumvi) folder can be used to test the forward pass using the tum-vi dataloader. The [test_monorec.py](example-tumvi/test_monorec.py) script can be used to test inference on an entire dataset i.e. with multilpe sequences, and the [test_monorec_seq.py](example-tumvi/test_monorec_seq.py) can be used to test inference on a single sequence. 
+  
+Make sure to activate the conda environment for both inference and training using:  
+```sh
+conda activate monorec
 ```
+Usage:  
+```sh
+python3 test_monorec.py
+```  
+******set pretrain_mode=1 to just evaluate the depth module without using the mask module****
 
-## 🏗️️ Setup
+### Pointcloud generation:  
+To evaluate the model, a pointcloud can be generated. [CloudCompare](https://www.danielgm.net/cc/) was used for viewing the generated pointclouds. Either [rgbd2pcl.py](rgbd2pcl.py) or [create_pointcloud.py](create_pointcloud.py) can be used. Usage of [rgbd2pcl.py](rgbd2pcl.py) is mentioned above.  
 
-The `conda` environment for this project can be setup by running the following command:
-
-```shell
-conda env create -f environment.yml
-```
-
-## 🏃 Running the Example Script
-
-We provide a sample from the KITTI Odometry test set and a script to run MonoRec on it in ``example/``. 
-To download the pretrained model and put it into the right place, run ``download_model.sh``. 
-You can manually do this by downloading the weights from [here](https://vision.in.tum.de/_media/research/monorec/monorec_depth_ref.pth.zip) 
-and unpacking the file to ``saved/checkpoints/monorec_depth_ref.pth``.
-The example script will plot the keyframe, depth prediction and mask prediction.
-
-```shell
-cd example
-python test_monorec.py
-```
-
-## 🗃️ Data
-
-In all of our experiments we used the KITTI Odometry dataset for training. For additional evaluations, we used the KITTI, Oxford RobotCar, 
-TUM Mono-VO and TUM RGB-D datasets. All datapaths can be specified in the respective configuration files. In our experiments, we put all datasets into a seperate folder ```../data```.
-
-### KITTI Odometry
-
-To setup KITTI Odometry, download the color images and calibration files from the 
-[official website](http://www.cvlibs.net/datasets/kitti/eval_odometry.php) (around 145 GB). Instead of the given 
-velodyne laser data files, we use the improved ground truth depth for evaluation, which can be downloaded from 
-[here](http://www.cvlibs.net/datasets/kitti/eval_depth_all.php). 
-
-Unzip the color images and calibration files into ```../data```. The lidar depth maps can be extracted into the given 
-folder structure by running ```data_loader/scripts/preprocess_kitti_extract_annotated_depth.py```.
-
-For training and evaluation, we use the poses estimated by [Deep Virtual Stereo Odometry (DVSO)](https://vision.in.tum.de/research/vslam/dvso). They can be downloaded 
-from [here](https://vision.in.tum.de/_media/research/monorec/poses_dvso.zip) and should be placed under ``../data/{kitti_path}/poses_dso``. This folder structure is ensured when 
-unpacking the zip file in the ``{kitti_path}`` directory.
-
-To supplement the self-supervised training, we use sparse depth maps generated by [Deep Virtual Stereo Odometry (DVSO)](https://vision.in.tum.de/research/vslam/dvso) 
-during the pose etimation. They can be downloaded from [here](https://vision.in.tum.de/_media/research/monorec/depth_dvso.zip)
-and should be palced under ``../data/{kitti_path}/sequences/{seq_num}/image_depth_sparse``.
-This folder structure is ensured when unpacking the zip file in the ``{kitti_path}`` directory.
-
-The auxiliary moving object masks can be downloaded from [here](https://vision.in.tum.de/_media/research/monorec/mvobj_mask.zip). They should be placed under 
-``../data/{kitti_path}/sequences/{seq_num}/mvobj_mask``. This folder structure again is ensured when 
-unpacking the zip file in the ``{kitti_path}`` directory.
-
-Finally, for mask training, we also use index masks for the training data, which can be downloaded from [here](https://vision.in.tum.de/_media/research/monorec/index_masks.zip). They should be placed under 
-``../data/{kitti_path}/sequences/{seq_num}/``. This folder structure again is ensured when 
-unpacking the zip file in the ``{kitti_path}`` directory.
-
-### Oxford RobotCar
-
-
-To setup Oxford RobotCar, download the camera model files and the large sample from 
-[the official website](https://robotcar-dataset.robots.ox.ac.uk/downloads/). Code, as well as, camera extrinsics need to be downloaded 
-from the [official GitHub repository](https://github.com/ori-mrg/robotcar-dataset-sdk).
-Please move the content of the ``python`` folder to ``data_loaders/oxford_robotcar/``.
-``extrinsics/``, ``models/`` and ``sample/`` need to be moved to ``../data/oxford_robotcar/``. Note that for poses we 
-use the official visual odometry poses, which are not provided in the large sample. They need to be downloaded manually from
-[the raw dataset](http://mrgdatashare.robots.ox.ac.uk/download/?filename=datasets/2014-12-12-10-45-15/2014-12-12-10-45-15_vo.tar) 
-and unpacked into the sample folder.
-
-### TUM Mono-VO
-
-Unfortunately, TUM Mono-VO images are provided only in the original, distorted form. Therefore, they need to be undistorted 
-first before fed into MonoRec. To obtain poses for the sequences, we run the publicly available version 
-of [Direct Sparse Odometry](https://github.com/JakobEngel/dso).
-
-### TUM RGB-D
-
-The official sequences can be downloaded from [the official website](https://vision.in.tum.de/data/datasets/rgbd-dataset/download)
-and need to be unpacked under ``../data/tumrgbd/{sequence_name}``. Note that our provided dataset implementation assumes 
-intrinsics from ``fr3`` sequences. Note that the data loader for this dataset also relies on the code from the Oxford Robotcar dataset.
-
-## 🏋️ Training & Evaluation
-
-This repository provides training and evaluation configurations to reproduce the results from the paper.
-
-To train a model from scratch, first set the ``dataset_dir`` fields to the directory in which KITTI Odometry is located
-(default ``../data/dataset``).
-Then run the following commands in the given order:
-
-```shell
-python train.py --config configs/train/monorec/monorec_depth.json --options stereo                          # Depth Bootstrap
-python train_monorec.py --config configs/train/monorec/monorec_mask.json --options stereo                   # Mask Bootstrap
-python train_monorec.py --config configs/train/monorec/monorec_mask_ref.json --options mask_loss            # Mask Refinement
-python train_monorec.py --config configs/train/monorec/monorec_depth_ref.json --options stereo stereo_repr  # Depth Refinement
+Usage for [create_pointcloud.py](create_pointcloud.py):  
+```sh
+python create_pointcloud.py --config configs/test/pointcloud_monorec_tumvi.json
 ```
 
-The final model will be stored under ``saved/models/monorec_depth_ref/00/checkpoint.pth``. 
+## Training:
+*****Note:***  
+_Change Ubuntu GUI mode for better speed during training [[ref1]](https://linuxconfig.org/how-to-disable-enable-gui-on-boot-in-ubuntu-20-04-focal-fossa-linux-desktop)[[ref2]](https://medium.com/@leicao.me/how-to-run-xorg-server-on-integrated-gpu-c5f38ae7ccc8)   
+good practices for training on multiple GPUs [[ref]](https://medium.com/huggingface/training-larger-batches-practical-tips-on-1-gpu-multi-gpu-distributed-setups-ec88c3e51255)_
 
-We also provide checkpoints for each training stage:
+Run the following commands:  
+```sh
+python train.py --config configs/train/monorec/monorec_depth_tumvi.json --options stereo                          # Depth Bootstrap
+python train_monorec.py --config configs/train/monorec/monorec_mask_tumvi.json --options stereo                   # Mask Bootstrap
+python train_monorec.py --config configs/train/monorec/monorec_mask_ref_tumvi.json --options mask_loss            # Mask Refinement
+python train_monorec.py --config configs/train/monorec/monorec_depth_ref_tumvi.json --options stereo stereo_repr  # Depth Refinement
+```  
 
-| Training stage | Download |
-| --- | --- |
-| Depth Bootstrap  | [Link](https://vision.in.tum.de/_media/research/monorec/monorec_depth.pth.zip) |
-| Mask Bootstrap  | [Link](https://vision.in.tum.de/_media/research/monorec/monorec_mask.pth.zip) |
-| Mask Refinement  | [Link](https://vision.in.tum.de/_media/research/monorec/monorec_mask_ref.pth.zip) |
-| Depth Refinement (**final model**)  | [Link](https://vision.in.tum.de/_media/research/monorec/monorec_depth_ref.pth.zip) |
+To monitor the training using tensorboard, set the parameter ```tensorboard``` to ```true``` in the config, and run the command below in a separate terminal:  
+```sh
+DenseReconstruction$ tensorboard --logdir=saved/log/monorec_depth/00
+``` 
 
-Run ``download_model.sh`` to download the final model. It will automatically get moved to ``saved/checkpoints``. 
-
-To reproduce the evaluation results on different datasets, run the following commands:
-
-```shell
-python evaluate.py --config configs/evaluate/eval_monorec.json        # KITTI Odometry
-python evaluate.py --config configs/evaluate/eval_monorec_oxrc.json   # Oxford Robotcar
-```
-
-## ☁️ Pointclouds
-
-To reproduce the pointclouds depicted in the paper and video, use the following commands:
-
-```shell
-python create_pointcloud.py --config configs/test/pointcloud_monorec.json       # KITTI Odometry
-python create_pointcloud.py --config configs/test/pointcloud_monorec_oxrc.json  # Oxford Robotcar
-python create_pointcloud.py --config configs/test/pointcloud_monorec_tmvo.json  # TUM Mono-VO
-```
+## Important Hyperparameters for TUM-VI/RealSense-Bag:  
+Some hyperparameters needed to be tuned differently for the TUM-VI dataset or the dataset recorded using the RealSense from the ones used in the paper for the KITTI dataset.  
+1. The ```inv_depth_min_max``` parameter must be set to (1.0, 0.0025) for training as the dataset has been recorded using a hand-held device as opposed to a device mounted on a car(KITTI).  
+2. The ```step_size``` and ```gamma``` parameters of the ```lr_scheduler``` must be properly tuned keeping in mind the size of the dataset.  
+3. The parameter ```alpha``` which is reponsible for assigning weight to the ```sparse_depth_loss``` and the ```self_supervision_loss```(combination of photometric_inconsistency_cv and edge_aware_smoothness_loss) must be set properly after observing the intermediate results during training.  
+4. The ```num_workers``` and ```batch_size``` parameters must be set considering the compute power, size of dataset etc. [[ref1]](https://chtalhaanwar.medium.com/pytorch-num-workers-a-tip-for-speedy-training-ed127d825db7) [[ref2]](https://deeplizard.com/learn/video/kWVgvsejXsE)

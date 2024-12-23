@@ -34,7 +34,9 @@ class PLYSaver(torch.nn.Module):
     def add_depthmap(self, depth: torch.Tensor, image: torch.Tensor, intrinsics: torch.Tensor,
                      extrinsics: torch.Tensor):
         depth = 1 / depth
-        image = (image + .5) * 255
+        # image = (image + .5) * 255
+        image = (image + .5)    # for pointcloud visualization in CloudCompare (TYPE - float)
+
         mask = (self.min_d <= depth) & (depth <= self.max_d)
         if self.roi is not None:
             mask[:, :, :self.roi[0], :] = False
