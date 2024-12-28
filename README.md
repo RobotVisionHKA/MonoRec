@@ -1,4 +1,4 @@
-# DenseReconstruction  
+# MonoRec - Dense Reconstruction  
 This is a clone of the [MonoRec](https://github.com/Brummi/MonoRec) repository with changes to run inference and train on Euroc type datasets, specifically the [TUM-VI](https://vision.in.tum.de/data/datasets/visual-inertial-dataset) dataset.  
 
 The tum-vi dataset is a visual inertial dataset that contains sequences recorded from a handheld setup consisting of a stereo setup with two cameras(fisheye lens). The images are grayscale. It also provide synchronised IMU data(ggyro and accel).  
@@ -98,7 +98,7 @@ python train_monorec.py --config configs/train/monorec/monorec_depth_ref_tumvi.j
 
 To monitor the training using tensorboard, set the parameter ```tensorboard``` to ```true``` in the config, and run the command below in a separate terminal:  
 ```sh
-DenseReconstruction$ tensorboard --logdir=saved/log/monorec_depth/00
+MonoRec$ tensorboard --logdir=saved/log/monorec_depth/00
 ``` 
 
 ## Important Hyperparameters for TUM-VI/RealSense-Bag:  
